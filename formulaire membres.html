@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Formulaire Membres</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f7fa;
+      padding: 20px;
+    }
+    h2 {
+      text-align: center;
+      color: #333;
+    }
+    form {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 500px;
+      margin: auto;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    input[type=text] {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0 16px 0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-sizing: border-box;
+    }
+    #signature {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      width: 100%;
+      height: 150px;
+      touch-action: none;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    #status {
+      text-align: center;
+      margin-top: 10px;
+      color: green;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Formulaire d'inscription des membres</h2>
+
+<form id="memberForm">
+  Nom: <input type="text" name="nom" required><br>
+  Prénom: <input type="text" name="prenom" required><br>
+  Matricule: <input type="text" name="matricule" required><br>
+  Ville: <input type="text" name="ville" required><br>
+
+  Signature:<br>
+  <canvas id="signature"></canvas>
+  <button type="button" id="clearSig">Effacer signature</button><br><br>
+
+  <button type="submit">Envoyer et Télécharger PDF</button>
+</form>
+
+<p id="status"></p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+  const form = document.getElementById('memberForm');
+  const canvas = document.getElementById('signature');
+  const ctx = canvas.getContext('2d');
+  let drawing = false;
+
+  // Pour dessiner la signature
+  canvas.addEventListener('mousedown', e => { drawing = true; ctx.moveTo(e.offsetX, e.offsetY); });
+  canvas.addEventListener('mouseup', e => { drawing = false; });
+  canvas.addEventListener('mousemove', e => { if(drawing){ ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); } });
+
+  // Support tactile pour mobile
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    drawing = true;
+    ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+  });
+  canvas.addEventListener('touchend', e => { drawing = false; });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if(drawing){
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+      ctx.stroke();
+    }
+  });
+
+  document.getElementById('clearSig').addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  });
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const data = new FormData(form);
+
+    // Générer PDF
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(14);
+    doc.text(`Nom: ${data.get('nom')}`, 10, 20);
+    doc.text(`Prénom: ${data.get('prenom')}`, 10, 30);
+    doc.text(`Matricule: ${data.get('matricule')}`, 10, 40);
+    doc.text(`Ville: ${data.get('ville')}`, 10, 50);
+
+    // Ajouter la signature au PDF
+    const imgData = canvas.toDataURL('image/png');
+    doc.addImage(imgData, 'PNG', 10, 60, 180, 60);
+
+    // Télécharger PDF
+    doc.save(`${data.get('nom')}_${data.get('prenom')}.pdf`);
+
+    // Envoyer les données vers Google Sheets
+    fetch('TON_URL_WEB_APP', { // Remplace par ton URL Apps Script
+      method: 'POST',
+      body: data
+    })
+    .then(response => response.text())
+    .then(text => {
+      document.getElementById('status').innerText = "Formulaire envoyé et PDF téléchargé !";
+      form.reset();
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+    })
+    .catch(err => {
+      document.getElementById('status').innerText = "Erreur lors de l'envoi.";
+    });
+  });
+</script>
+
+</body>
+</html>
